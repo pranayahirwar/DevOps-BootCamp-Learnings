@@ -1,0 +1,25 @@
+# demo.aws_ec2.yml
+plugin: amazon.aws.aws_ec2
+
+# This sets the region. If empty (the default) default this will include all regions, except possibly
+# restricted ones like us-gov-west-1 and cn-north-1.
+regions:
+- ap-south-1
+
+#Creating special group for production and developer server
+keyed_groups:
+  - key: tags
+    prefix: tag
+    
+  - key: instance_type
+    prefix: oooog
+
+# this is used to display filtered resulted from this plugin.
+# hostnames:
+#   # - ip-address
+#   - name: 'private-ip-address'
+#     separator: '_'
+#     prefix: 'tag:Name'
+
+#KEYWORD EXPLAINED
+#prefix -> When you will use this they will attach the given word in the output you will receive in terminal

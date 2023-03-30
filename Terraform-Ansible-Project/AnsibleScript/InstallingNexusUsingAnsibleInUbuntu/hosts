@@ -1,0 +1,4 @@
+[vmx]
+192.172.1.11 ansible_user=server_username
+[vmx:vars]
+ansible_ssh_private_key_file=~/.ssh/id_rsa

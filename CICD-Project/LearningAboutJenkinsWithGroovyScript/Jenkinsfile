@@ -1,0 +1,52 @@
+#!/usr/bin/env groovy
+
+def gv
+pipeline{
+    agent any
+    tools {
+        maven 'ourMaven_3.8.6'
+    }
+
+    stages{
+        stage('init'){
+            steps {
+                script {
+                    gv = load 'script.groovy'
+                }
+            }
+        }
+
+        stage('Building Jarfile'){
+            steps {
+                script {
+                    echo 'Building Maven Package ...'
+                    sh "mvn package"
+                }
+            }
+        }
+
+        stage('Building Docker Image && Sending to dockerHub'){
+            steps {
+                script {
+                    echo "Building docker image..."
+                    sh "docker build -t pranayahirwar/buildedapp:1.10 ."
+                    withCredentials([usernamePassword(credentialsId: 'dockerHubCred', usernameVariable:'USER', passwordVariable:'PSD')]){
+                        sh "echo $PSD | docker login -u $USER --password-stdin "
+                        sh "docker push pranayahirwar/buildedapp:1.10"
+                    }
+                    
+                    
+                }
+            }
+        }
+
+        stage('Deploying'){
+            steps {
+                script {
+                    gv.beforProd()
+                }
+            }
+        }
+    }
+
+}

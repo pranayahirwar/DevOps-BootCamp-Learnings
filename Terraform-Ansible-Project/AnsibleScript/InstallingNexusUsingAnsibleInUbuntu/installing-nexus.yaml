@@ -1,0 +1,108 @@
+---
+- name: THIS WILL INSTALL NEXUS IN SERVER....
+  become: true
+  become_user: root
+  hosts: vmx
+  tasks:
+  - name: UPDATING SERVER CACHE
+    apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+  - name: INSTALLING JAVA AND NET-TOOLS
+    apt:
+      pkg:
+      - openjdk-8-jre-headless
+      - net-tools
+      - htop
+      - tree
+
+  - name: CHECKING IF NEXUS FOLDER IS ALREADY PRESENT OR NOT...
+    stat:
+      path: /opt/nexus
+    register: is_nexus_folder_present
+  - debug: msg={{ is_nexus_folder_present }}
+
+  - name: DOWNLODING NEXUS FROM GIVEN URL
+    get_url: 
+      url: https://download.sonatype.com/nexus/3/nexus-3.49.0-02-unix.tar.gz
+      dest: /opt/
+    register: nexus_file_path
+    when: not is_nexus_folder_present.stat.exists
+  - debug: msg={{nexus_file_path}}
+    when: not is_nexus_folder_present.stat.exists
+
+  - name: UN-TAR NEXUS FILE
+    unarchive:
+      src: "{{ nexus_file_path.dest }}"
+      dest: /opt/
+      remote_src: true
+    when: not is_nexus_folder_present.stat.exists
+
+  - name: FINDING NEXUS-FILE NAME FOR FUTHER OPERATION
+    find:
+      paths: /opt
+      pattern: "nexus-*"
+      file_type: directory
+    register: extracted_nexus_file_name
+    when: not is_nexus_folder_present.stat.exists
+  - debug: msg={{extracted_nexus_file_name}}
+    when: not is_nexus_folder_present.stat.exists
+
+  - name: RENAMING DEFAULT-NEXUS FILE TO NEXUS
+    shell: mv {{ extracted_nexus_file_name.files[0].path }} /opt/nexus
+    when: not is_nexus_folder_present.stat.exists
+    
+- name: GOING ROOT FOR GROUP-USER CREATION
+  become: true
+  become_user: root
+  hosts: vmx
+  tasks:
+  - name: CREATING NEXUS GROUP
+    group:
+      name: nexus_group
+      state: present
+  - name: CREATING NEXUS USER
+    user:
+      name: nexus_user
+      groups: sudo, nexus_group
+      state: present
+  - name: CHANGIN FOLDER ACCESS FROM ROOT TO NEXUS_USER 
+    file: 
+      path: /opt/nexus
+      state: directory
+      owner: nexus_user
+      group: nexus_group
+      recurse: yes
+  - name: CHANGIN FOLDER ACCESS FROM ROOT TO NEXUS_USER 
+    file: 
+      path: /opt/sonatype-work
+      state: directory
+      owner: nexus_user
+      group: nexus_group
+      recurse: yes
+  - name: CONFIGURING NEXUS.RC FILE. 
+    lineinfile: 
+      path: /opt/nexus/bin/nexus.rc
+      regexp: '^run_as_user=""'
+      line: run_as_user="nexus_user"
+  - name: USING COMMAND TO RUN NEXUS
+    command: /opt/nexus/bin/nexus stop
+
+- name: RUNNING NEXUS APPLICATION
+  hosts: vmx
+  tasks:
+  - name: WATING FOR SOME TIME FOR PORT VISIBILITY
+    pause:
+      seconds: 3
+  - name: GETTIN NETSTAT STATUS
+    command: netstat -lntp
+    register: netstat_status
+  - debug: msg={{netstat_status.stdout_lines}}
+  - name: GETTING STATUS FROM PS-COMMAND
+    command: ps aux | grep nexus
+    register: aux_status
+  - debug: msg={{aux_status.stdout_lines}}
+
+# Some command which can come in handy
+  # - name: Use this configuration when you would like to delete all the contents from the file.
+  #   ansible.builtin.blockinfile:
+  #     path: /opt/nexus/bin/nexus.rc
+  #     block: ""

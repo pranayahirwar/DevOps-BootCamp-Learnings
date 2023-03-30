@@ -1,0 +1,77 @@
+---
+- name: Waiting for instance creation
+  hosts: aws_ec2
+  gather_facts: False
+  tasks:
+    - name: Ensuring port 22 is open
+      wait_for:
+        port: 22
+        delay: 10
+        timeout: 100
+        search_regex: OpenSSH
+        host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+      vars:
+        ansible_connection: local
+        ansible_python_interpreter: /usr/bin/python3
+
+- name: Install python3, docker, docker-compose
+  hosts: aws_ec2
+  become: yes
+  vars_files:
+    - docker-vars.yaml
+  gather_facts: False
+  tasks:
+    - name: Install python3 and docker
+      ansible.builtin.yum: 
+        name: 
+          # - python3
+          - docker
+          - tree
+        update_cache: yes
+        state: present
+
+    - name: Install Docker-compose
+      ansible.builtin.get_url: 
+        # url: https://github.com/docker/compose/releases/download/v2.16.4/docker-compose-Linux-{{lookup('pipe', 'uname -m')}}
+        url: https://github.com/docker/compose/releases/download/{{compose_version}}/docker-compose-linux-{{lookup('pipe', 'uname -m')}}
+        dest: /usr/local/bin/docker-compose
+        mode: +x
+      async: 1000
+      poll: 0
+
+    - name: Start docker daemon
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+  
+    - name: Install docker python module
+      ansible.builtin.pip:
+        name: 
+          - docker
+          - docker-compose
+    
+
+- name: Add ec2-user to docker group
+  hosts: aws_ec2
+  become: yes
+  tasks: 
+    - name: Add ec2-user to docker group
+      ansible.builtin.user: 
+        name: ec2-user
+        groups: docker
+        append: yes
+
+    - name: Reconnect to server session
+      ansible.builtin.meta: reset_connection
+
+
+- name: Start docker containers
+  hosts: aws_ec2
+  vars_files:
+    - docker-vars.yaml
+  tasks:
+    - name: Copy docker compose
+      ansible.builtin.copy:
+        src: /home/manager/workingWithAnsible/docker-ansible-ec2/ansible.cfg
+        dest: /home/ec2-user/ansible_inventory_file.yaml
+ 

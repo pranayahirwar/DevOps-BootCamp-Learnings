@@ -1,0 +1,45 @@
+#This yaml script is written for ansible for installing and running node-js application.
+#updating cache before installing node JS
+
+- name: FIRST-JOB -> NODE-JS Project...
+  hosts: azure
+  become: true
+  become_user: root
+  tasks:
+  - name: UPDATING CACHE
+    apt:
+      update_cache: yes
+      cache_valid_time: 3600
+      force_apt_get: yes
+  - name: INSTALLING NODE-JS & NPM
+    apt:
+      pkg:
+      - nodejs-legacy
+      - npm
+      state: present
+
+#Moving nodejs Application tar file to remote server and unpacking it
+- name: SECOND-JOB -> MOVING TAR FILE TO SERVER
+  hosts: azure
+  tasks:
+  - name: MV to REMOTE
+    unarchive:
+      src: /destination/for/simple-nodejs/nodejs-app-1.0.0.tgz
+      dest: /home/server_name/
+  #RUNNING NODEJS APP
+  - name: INSTALLING DEPENDENCIES (npm init) WILL RUN...
+    npm:
+      path: /home/server_name/package
+  - name: INSTALLING DEPENDENCIES
+    command:
+        chdir: /home/server_name/package/app
+        cmd: npm package.json
+  - name: USING COMMANDS AND SHELL FOR STARTING NODE-JS
+    command:
+      chdir: /home/server_name/package/app
+      cmd: node server
+    #The two values below this are used, to tell ansible don't give-out terminal access to program which is runned just now `node server`
+    #async work in seconds, it tell ansible to wait for 1000s for program to start before moving to next one
+    #based on value, poll tell ansible to wait, If it is zero it indicate directly move to next program without gathering any result of the executed program,
+    async: 1000
+    poll: 0 
